@@ -12,7 +12,6 @@ Autor: Ing. Kevin Inofuente Colque - DataPath
 
 import os
 import re
-import json
 import unicodedata
 from typing import Optional
 
@@ -73,54 +72,26 @@ def _get_worksheet():
         return _worksheet
 
     print("   🔸 [sheets] _get_worksheet: sin caché, iniciando conexión...", flush=True)
-    credentials_value = GOOGLE_APPLICATION_CREDENTIALS.strip()
+    creds_path = _resolve_credentials_path(GOOGLE_APPLICATION_CREDENTIALS)
+    print(f"   🔸 [sheets] Ruta de credenciales: '{creds_path}'", flush=True)
 
-    # Cloud Run / Secret Manager:
-    # GOOGLE_APPLICATION_CREDENTIALS contiene directamente el JSON.
-    if credentials_value.startswith("{"):
-        print("   🔸 [sheets] Credencial detectada como JSON inline (variable de entorno / secreto)", flush=True)
-        try:
-            credentials_info = json.loads(credentials_value)
-        except json.JSONDecodeError as e:
-            print(f"   ❌ [sheets] El JSON de GOOGLE_APPLICATION_CREDENTIALS es inválido: {e}", flush=True)
-            raise ValueError(
-                "El secreto GOOGLE_APPLICATION_CREDENTIALS no contiene un JSON válido."
-            ) from e
+    if not os.path.isfile(creds_path):
+        print(f"   ❌ [sheets] No se encontró el archivo de credenciales en '{creds_path}'", flush=True)
+        raise FileNotFoundError(
+            f"No se encontró el JSON de la cuenta de servicio en '{creds_path}'. "
+            f"Descárgalo desde Google Cloud y colócalo en esa ruta."
+        )
 
-        try:
-            creds = Credentials.from_service_account_info(
-                credentials_info,
-                scopes=SCOPES,
-            )
-            print(f"   🔸 [sheets] Credenciales cargadas OK para: "
-                  f"{credentials_info.get('client_email', '¿desconocido?')}", flush=True)
-        except Exception as e:
-            print(f"   ❌ [sheets] Error creando Credentials.from_service_account_info: "
-                  f"{type(e).__name__}: {e}", flush=True)
-            raise
-
-    # Entorno local:
-    # GOOGLE_APPLICATION_CREDENTIALS contiene una ruta al JSON.
-    else:
-        creds_path = _resolve_credentials_path(credentials_value)
-        print(f"   🔸 [sheets] Credencial detectada como ruta de archivo: '{creds_path}'", flush=True)
-
-        if not os.path.isfile(creds_path):
-            print(f"   ❌ [sheets] No se encontró el archivo de credenciales en '{creds_path}'", flush=True)
-            raise FileNotFoundError(
-                f"No se encontró el JSON de la cuenta de servicio en '{creds_path}'."
-            )
-
-        try:
-            creds = Credentials.from_service_account_file(
-                creds_path,
-                scopes=SCOPES,
-            )
-            print("   🔸 [sheets] Credenciales cargadas OK desde archivo", flush=True)
-        except Exception as e:
-            print(f"   ❌ [sheets] Error creando Credentials.from_service_account_file: "
-                  f"{type(e).__name__}: {e}", flush=True)
-            raise
+    try:
+        creds = Credentials.from_service_account_file(
+            creds_path,
+            scopes=SCOPES,
+        )
+        print("   🔸 [sheets] Credenciales cargadas OK desde archivo", flush=True)
+    except Exception as e:
+        print(f"   ❌ [sheets] Error creando Credentials.from_service_account_file: "
+              f"{type(e).__name__}: {e}", flush=True)
+        raise
 
     try:
         client = gspread.authorize(creds)
