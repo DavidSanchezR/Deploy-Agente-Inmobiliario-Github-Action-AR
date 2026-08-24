@@ -47,7 +47,7 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --service-account=deploy-langchain-inmobiliario@datapath-ai-david-sanchez.iam.gserviceaccount.com\
+            --service-account=deploy-langchain-inmobiliario@datapath-ai-david-sanchez.iam.gserviceaccount.com \
             --set-secrets="\
           AGENT_TIMEZONE=AGENT_TIMEZONE:latest,\
           CHATWOOT_ACCOUNT_ID=CHATWOOT_ACCOUNT_ID:latest,\
@@ -66,5 +66,8 @@ jobs:
           QDRANT_API_KEY=QDRANT_API_KEY:latest,\
           QDRANT_COLLECTION=QDRANT_COLLECTION:latest,\
           QDRANT_URL=QDRANT_URL:latest,\
-          TAVILY_API_KEY=TAVILY_API_KEY:latest\
-          /usr/src/app/src/credentials/datapath-ai-david-sanchez-500c274bd309.json=GOOGLE_APPLICATION_CREDENTIALS:latest\"
+          TAVILY_API_KEY=TAVILY_API_KEY:latest"
+
+          gcloud run services update $SERVICE_NAME \
+            --region us-central1 \
+            --update-secrets="/usr/src/app/src/credentials/datapath-ai-david-sanchez-500c274bd309.json=GOOGLE_APPLICATION_CREDENTIALS:latest"
