@@ -6,3 +6,7 @@
 
 # Carpeta de configuración local de VSCode
 .vscode/
+
+.env
+.env.*
+!.env.example
