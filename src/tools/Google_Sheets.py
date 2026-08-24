@@ -12,6 +12,7 @@ Autor: Ing. Kevin Inofuente Colque - DataPath
 
 import os
 import re
+import json
 import unicodedata
 from typing import Optional
 
@@ -66,20 +67,46 @@ def _resolve_credentials_path(path: str) -> str:
 def _get_worksheet():
     """Conecta a Google Sheets de forma lazy y devuelve el worksheet."""
     global _worksheet
+
     if _worksheet is not None:
         return _worksheet
 
-    creds_path = _resolve_credentials_path(GOOGLE_APPLICATION_CREDENTIALS)
-    if not os.path.isfile(creds_path):
-        raise FileNotFoundError(
-            f"No se encontró el JSON de la cuenta de servicio en '{creds_path}'. "
-            f"Descárgalo desde Google Cloud y colócalo en esa ruta."
+    credentials_value = GOOGLE_APPLICATION_CREDENTIALS.strip()
+
+    # Cloud Run / Secret Manager:
+    # GOOGLE_APPLICATION_CREDENTIALS contiene directamente el JSON.
+    if credentials_value.startswith("{"):
+        try:
+            credentials_info = json.loads(credentials_value)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                "El secreto GOOGLE_APPLICATION_CREDENTIALS no contiene un JSON válido."
+            ) from e
+
+        creds = Credentials.from_service_account_info(
+            credentials_info,
+            scopes=SCOPES,
         )
 
-    creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+    # Entorno local:
+    # GOOGLE_APPLICATION_CREDENTIALS contiene una ruta al JSON.
+    else:
+        creds_path = _resolve_credentials_path(credentials_value)
+
+        if not os.path.isfile(creds_path):
+            raise FileNotFoundError(
+                f"No se encontró el JSON de la cuenta de servicio en '{creds_path}'."
+            )
+
+        creds = Credentials.from_service_account_file(
+            creds_path,
+            scopes=SCOPES,
+        )
+
     client = gspread.authorize(creds)
     sheet = client.open_by_key(GOOGLE_SHEET_ID)
     _worksheet = sheet.worksheet(GOOGLE_SHEETS_WORKSHEET)
+
     return _worksheet
 
 
