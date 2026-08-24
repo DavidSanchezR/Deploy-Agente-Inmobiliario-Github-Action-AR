@@ -1,0 +1,32 @@
+# Secretos y credenciales
+.env
+.env.*
+# La plantilla SÍ se versiona: solo lleva placeholders, ningún valor real
+!.env.example
+credentials/
+*.json
+!requirements*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+# Ignorar todas las credenciales JSON
+*.json
+
+# Excepto la configuración del dev container (esta SÍ se sube)
+!.devcontainer/devcontainer.json
+
+# Carpeta de configuración local de VSCode
+.vscode/

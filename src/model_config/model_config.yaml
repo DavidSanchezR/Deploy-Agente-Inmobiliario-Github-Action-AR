@@ -1,0 +1,16 @@
+# ============================================
+# Configuración del modelo LLM del agente
+# Autor: Ing. Kevin Inofuente Colque - DataPath
+# ============================================
+# Config pura: sin código y sin prompt (el prompt vive en prompt.yaml).
+# Solo claves que el código realmente lee.
+
+llm:
+  provider: openai
+  model: gpt-4.1
+  temperature: 0.7
+
+agent:
+  # Zona horaria por defecto para el contexto temporal del prompt.
+  # Se sobreescribe con la variable de entorno AGENT_TIMEZONE si está definida.
+  timezone: America/Lima
