@@ -47,7 +47,7 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --service-account=deploy-langchain-inmobiliario@datapath-ai-david-sanchez.iam.gserviceaccount.com
+            --service-account=deploy-langchain-inmobiliario@datapath-ai-david-sanchez.iam.gserviceaccount.com\
             --set-secrets="\
           AGENT_TIMEZONE=AGENT_TIMEZONE:latest,\
           CHATWOOT_ACCOUNT_ID=CHATWOOT_ACCOUNT_ID:latest,\
