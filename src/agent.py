@@ -121,44 +121,76 @@ def chat_con_agente(mensaje_usuario: str, session_id: str) -> str:
     Ejecuta el agente con tools y memoria.
     El agente decide si usar herramientas o responder directamente.
     """
+    print(f"🟦 [agent] INICIO | session={session_id} | mensaje='{mensaje_usuario[:120]}'", flush=True)
+
     # Obtener historial
-    history = get_session_history(session_id)
-    mensajes_previos = history.messages
-    
+    try:
+        history = get_session_history(session_id)
+        mensajes_previos = history.messages
+        print(f"🟦 [agent] Historial cargado: {len(mensajes_previos)} mensaje(s) previo(s)", flush=True)
+    except Exception as e:
+        print(f"❌ [agent] ERROR al cargar historial (PostgreSQL): {type(e).__name__}: {e}", flush=True)
+        raise
+
     # Construir mensajes para el modelo (inyectamos fecha/hora actual en cada turno)
     messages = [{"role": "system", "content": _render_system_prompt()}]
-    
+
     # Agregar historial
     for msg in mensajes_previos:
         if isinstance(msg, HumanMessage):
             messages.append({"role": "user", "content": msg.content})
         elif isinstance(msg, AIMessage):
             messages.append({"role": "assistant", "content": msg.content})
-    
+
     # Agregar mensaje actual
     messages.append({"role": "user", "content": mensaje_usuario})
-    
+
     # Invocar modelo con tools
-    response = chat_con_tools.invoke(messages)
-    
+    print(f"🟦 [agent] Invocando modelo (1ra llamada) | {len(messages)} mensajes | "
+          f"{len(tools)} tools disponibles: {[t.name for t in tools]}", flush=True)
+    try:
+        response = chat_con_tools.invoke(messages)
+    except Exception as e:
+        print(f"❌ [agent] ERROR en la 1ra llamada al modelo: {type(e).__name__}: {e}", flush=True)
+        raise
+
     # Procesar tool calls si existen
     if response.tool_calls:
+        print(f"🟩 [agent] El modelo SÍ solicitó tool(s): "
+              f"{[tc['name'] for tc in response.tool_calls]}", flush=True)
+
         # Ejecutar cada tool
         tool_results = []
         for tool_call in response.tool_calls:
             tool_name = tool_call["name"]
             tool_args = tool_call["args"]
-            
+            print(f"   ➡️ [agent] Ejecutando tool '{tool_name}' con args={tool_args}", flush=True)
+
             # Buscar y ejecutar la tool
+            encontrada = False
             for t in tools:
                 if t.name == tool_name:
-                    result = t.invoke(tool_args)
+                    encontrada = True
+                    try:
+                        result = t.invoke(tool_args)
+                        print(f"   ✅ [agent] Tool '{tool_name}' OK -> {len(str(result))} chars devueltos", flush=True)
+                    except Exception as e:
+                        print(f"   ❌ [agent] ERROR ejecutando tool '{tool_name}': "
+                              f"{type(e).__name__}: {e}", flush=True)
+                        result = f"Error ejecutando la herramienta '{tool_name}': {e}"
                     tool_results.append({
                         "tool_call_id": tool_call["id"],
                         "result": result
                     })
                     break
-        
+            if not encontrada:
+                print(f"   ⚠️ [agent] El modelo pidió la tool '{tool_name}' pero NO está "
+                      f"registrada en `tools` (revisa la lista en agent.py)", flush=True)
+                tool_results.append({
+                    "tool_call_id": tool_call["id"],
+                    "result": f"Error: la herramienta '{tool_name}' no está disponible."
+                })
+
         # Agregar respuesta del modelo con tool calls y resultados
         messages.append(response)
         for tr in tool_results:
@@ -166,18 +198,33 @@ def chat_con_agente(mensaje_usuario: str, session_id: str) -> str:
                 content=tr["result"],
                 tool_call_id=tr["tool_call_id"]
             ))
-        
+
         # Segunda llamada para obtener respuesta final
-        final_response = chat_con_tools.invoke(messages)
+        print(f"🟦 [agent] Invocando modelo (2da llamada) con {len(tool_results)} resultado(s) de tool", flush=True)
+        try:
+            final_response = chat_con_tools.invoke(messages)
+        except Exception as e:
+            print(f"❌ [agent] ERROR en la 2da llamada al modelo: {type(e).__name__}: {e}", flush=True)
+            raise
         respuesta_final = final_response.content
     else:
+        print("🟨 [agent] El modelo NO solicitó ninguna tool (ni Sheets, ni RAG, ni Internet). "
+              "Responde directo con lo que ya sabe.", flush=True)
         # Sin tool calls, respuesta directa
         respuesta_final = response.content
-    
+
+    print(f"🟦 [agent] Respuesta final ({len(respuesta_final or '')} chars): "
+          f"'{str(respuesta_final)[:200]}'", flush=True)
+
     # Guardar en historial
-    history.add_user_message(mensaje_usuario)
-    history.add_ai_message(respuesta_final)
-    
+    try:
+        history.add_user_message(mensaje_usuario)
+        history.add_ai_message(respuesta_final)
+        print("🟦 [agent] Historial guardado OK", flush=True)
+    except Exception as e:
+        print(f"❌ [agent] ERROR al guardar historial (PostgreSQL): {type(e).__name__}: {e}", flush=True)
+        raise
+
     return respuesta_final
 
 

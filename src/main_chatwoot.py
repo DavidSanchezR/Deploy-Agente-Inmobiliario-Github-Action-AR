@@ -7,6 +7,7 @@ Autor: Ing. Kevin Inofuente Colque - DataPath
 
 import os
 import sys
+import traceback
 import uuid
 import requests
 from dotenv import load_dotenv, find_dotenv
@@ -183,29 +184,30 @@ async def chatwoot_webhook(request: Request):
     
     # Procesar con el agente
     try:
-        print(f"   🤖 Procesando con el agente...")
-        
+        print(f"   🤖 [webhook] Procesando con el agente...", flush=True)
+
         # Convertir conversation_id a UUID para el historial
         session_id = conversation_id_to_uuid(conversation_id)
-        print(f"   📝 Session ID: {session_id[:8]}...")
-        
+        print(f"   📝 [webhook] Session ID: {session_id[:8]}...", flush=True)
+
         # Llamar al agente
         respuesta = chat_con_agente(message_content, session_id)
-        
-        print(f"   ✅ Respuesta generada ({len(respuesta)} chars)")
-        
+
+        print(f"   ✅ [webhook] Respuesta generada ({len(respuesta)} chars)", flush=True)
+
         # Enviar respuesta a Chatwoot
         send_chatwoot_message(conversation_id, respuesta)
-        
+
         return {"status": "success", "action": "agent_response"}
-        
+
     except Exception as e:
-        print(f"   ❌ Error al procesar: {e}")
-        
+        print(f"   ❌ [webhook] Error al procesar: {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc()
+
         # Enviar mensaje de error
         error_message = "Disculpa, tuve un problema al procesar tu consulta. Un asesor te atenderá pronto."
         send_chatwoot_message(conversation_id, error_message)
-        
+
         return {"status": "error", "message": str(e)}
 
 
@@ -253,8 +255,8 @@ async def test_agent(request: Request):
     
     try:
         respuesta = chat_con_agente(message, session_id)
-        print(f"   ✅ Respuesta: {respuesta[:100]}...")
-        
+        print(f"   ✅ Respuesta: {respuesta[:100]}...", flush=True)
+
         return {
             "message": message,
             "session_id": session_id,
@@ -262,7 +264,8 @@ async def test_agent(request: Request):
             "status": "success"
         }
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   ❌ Error: {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc()
         return {
             "message": message,
             "error": str(e),

@@ -69,43 +69,81 @@ def _get_worksheet():
     global _worksheet
 
     if _worksheet is not None:
+        print("   🔸 [sheets] _get_worksheet: usando worksheet cacheado (ya conectado antes)", flush=True)
         return _worksheet
 
+    print("   🔸 [sheets] _get_worksheet: sin caché, iniciando conexión...", flush=True)
     credentials_value = GOOGLE_APPLICATION_CREDENTIALS.strip()
 
     # Cloud Run / Secret Manager:
     # GOOGLE_APPLICATION_CREDENTIALS contiene directamente el JSON.
     if credentials_value.startswith("{"):
+        print("   🔸 [sheets] Credencial detectada como JSON inline (variable de entorno / secreto)", flush=True)
         try:
             credentials_info = json.loads(credentials_value)
         except json.JSONDecodeError as e:
+            print(f"   ❌ [sheets] El JSON de GOOGLE_APPLICATION_CREDENTIALS es inválido: {e}", flush=True)
             raise ValueError(
                 "El secreto GOOGLE_APPLICATION_CREDENTIALS no contiene un JSON válido."
             ) from e
 
-        creds = Credentials.from_service_account_info(
-            credentials_info,
-            scopes=SCOPES,
-        )
+        try:
+            creds = Credentials.from_service_account_info(
+                credentials_info,
+                scopes=SCOPES,
+            )
+            print(f"   🔸 [sheets] Credenciales cargadas OK para: "
+                  f"{credentials_info.get('client_email', '¿desconocido?')}", flush=True)
+        except Exception as e:
+            print(f"   ❌ [sheets] Error creando Credentials.from_service_account_info: "
+                  f"{type(e).__name__}: {e}", flush=True)
+            raise
 
     # Entorno local:
     # GOOGLE_APPLICATION_CREDENTIALS contiene una ruta al JSON.
     else:
         creds_path = _resolve_credentials_path(credentials_value)
+        print(f"   🔸 [sheets] Credencial detectada como ruta de archivo: '{creds_path}'", flush=True)
 
         if not os.path.isfile(creds_path):
+            print(f"   ❌ [sheets] No se encontró el archivo de credenciales en '{creds_path}'", flush=True)
             raise FileNotFoundError(
                 f"No se encontró el JSON de la cuenta de servicio en '{creds_path}'."
             )
 
-        creds = Credentials.from_service_account_file(
-            creds_path,
-            scopes=SCOPES,
-        )
+        try:
+            creds = Credentials.from_service_account_file(
+                creds_path,
+                scopes=SCOPES,
+            )
+            print("   🔸 [sheets] Credenciales cargadas OK desde archivo", flush=True)
+        except Exception as e:
+            print(f"   ❌ [sheets] Error creando Credentials.from_service_account_file: "
+                  f"{type(e).__name__}: {e}", flush=True)
+            raise
 
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(GOOGLE_SHEET_ID)
-    _worksheet = sheet.worksheet(GOOGLE_SHEETS_WORKSHEET)
+    try:
+        client = gspread.authorize(creds)
+        print("   🔸 [sheets] gspread.authorize() OK", flush=True)
+    except Exception as e:
+        print(f"   ❌ [sheets] Error en gspread.authorize(): {type(e).__name__}: {e}", flush=True)
+        raise
+
+    try:
+        sheet = client.open_by_key(GOOGLE_SHEET_ID)
+        print(f"   🔸 [sheets] open_by_key('{GOOGLE_SHEET_ID}') OK -> spreadsheet '{sheet.title}'", flush=True)
+    except Exception as e:
+        print(f"   ❌ [sheets] Error en open_by_key('{GOOGLE_SHEET_ID}'): "
+              f"{type(e).__name__}: {e}", flush=True)
+        raise
+
+    try:
+        _worksheet = sheet.worksheet(GOOGLE_SHEETS_WORKSHEET)
+        print(f"   🔸 [sheets] worksheet('{GOOGLE_SHEETS_WORKSHEET}') OK", flush=True)
+    except Exception as e:
+        print(f"   ❌ [sheets] Error en worksheet('{GOOGLE_SHEETS_WORKSHEET}'): "
+              f"{type(e).__name__}: {e}", flush=True)
+        raise
 
     return _worksheet
 
@@ -179,11 +217,21 @@ def _merge_headers_con_grupos(group_row: list, header_row: list) -> list:
 
 def _cargar_datos():
     """Lee la hoja y devuelve (headers, data_rows)."""
+    print("   🔸 [sheets] _cargar_datos: obteniendo worksheet...", flush=True)
     ws = _get_worksheet()
-    all_values = ws.get_all_values()
+
+    try:
+        all_values = ws.get_all_values()
+        print(f"   🔸 [sheets] get_all_values() OK -> {len(all_values)} fila(s) leída(s)", flush=True)
+    except Exception as e:
+        print(f"   ❌ [sheets] Error en get_all_values(): {type(e).__name__}: {e}", flush=True)
+        raise
+
     header_idx = GOOGLE_SHEETS_HEADER_ROW - 1
     group_idx = GOOGLE_SHEETS_GROUP_ROW - 1
     if header_idx >= len(all_values):
+        print(f"   ❌ [sheets] La hoja solo tiene {len(all_values)} fila(s), "
+              f"no alcanza la fila de encabezado {GOOGLE_SHEETS_HEADER_ROW}", flush=True)
         raise ValueError(
             f"La hoja no tiene fila {GOOGLE_SHEETS_HEADER_ROW} para usar como encabezado."
         )
@@ -194,6 +242,8 @@ def _cargar_datos():
         headers = [(h or "").strip() or "Columna" for h in header_row]
     headers = _dedup_headers(headers)
     data_rows = [r for r in all_values[header_idx + 1:] if any(c.strip() for c in r)]
+    print(f"   🔸 [sheets] Headers parseados ({len(headers)}): {headers}", flush=True)
+    print(f"   🔸 [sheets] Filas de datos con contenido: {len(data_rows)}", flush=True)
     return headers, data_rows
 
 
@@ -214,15 +264,19 @@ def _buscar_fila_inquilino(rows: list, headers: list, identificador: str) -> Opt
     """Busca la fila de un locatario por nombre (parcial) o identificador de unidad."""
     ident_norm = _normalize(identificador)
     if not ident_norm:
+        print("   ⚠️ [sheets] _buscar_fila_inquilino: identificador vacío tras normalizar", flush=True)
         return None
 
     idx_nombre, idx_depto = _columnas_identificadoras(headers)
+    print(f"   🔸 [sheets] _buscar_fila_inquilino: identificador='{ident_norm}' | "
+          f"idx_nombre={idx_nombre} | idx_depto={idx_depto} | {len(rows)} fila(s) a revisar", flush=True)
     es_numero = bool(re.fullmatch(r"\d+", ident_norm))
 
     # Pase 1: si es número, priorizar coincidencia exacta por depto
     if es_numero and idx_depto is not None:
         for row in rows:
             if idx_depto < len(row) and _normalize(row[idx_depto]) == ident_norm:
+                print(f"   ✅ [sheets] Match en Pase 1 (depto exacto): fila -> {row}", flush=True)
                 return dict(zip(headers, row))
 
     # Pase 2: coincidencia parcial por nombre
@@ -231,6 +285,7 @@ def _buscar_fila_inquilino(rows: list, headers: list, identificador: str) -> Opt
             if idx_nombre < len(row):
                 nombre = _normalize(row[idx_nombre])
                 if nombre and ident_norm in nombre:
+                    print(f"   ✅ [sheets] Match en Pase 2 (nombre parcial): fila -> {row}", flush=True)
                     return dict(zip(headers, row))
 
     # Pase 3: coincidencia parcial por depto (para casos como "depto 301" → "301")
@@ -239,8 +294,11 @@ def _buscar_fila_inquilino(rows: list, headers: list, identificador: str) -> Opt
             if idx_depto < len(row):
                 depto = _normalize(row[idx_depto])
                 if depto and (depto == ident_norm or ident_norm in depto):
+                    print(f"   ✅ [sheets] Match en Pase 3 (depto parcial): fila -> {row}", flush=True)
                     return dict(zip(headers, row))
 
+    print(f"   ⚠️ [sheets] _buscar_fila_inquilino: SIN coincidencias para '{ident_norm}' "
+          f"en {len(rows)} fila(s)", flush=True)
     return None
 
 
