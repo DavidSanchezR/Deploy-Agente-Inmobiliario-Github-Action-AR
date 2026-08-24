@@ -59,6 +59,7 @@ jobs:
           DB_PASSWORD=DB_PASSWORD:latest,\
           DB_PORT=DB_PORT:latest,\
           DB_USER=DB_USER:latest,\
+          GOOGLE_APPLICATION_CREDENTIALS=GOOGLE_APPLICATION_CREDENTIALS:latest,\
           GOOGLE_SHEET_ID=GOOGLE_SHEET_ID:latest,\
           GOOGLE_SHEETS_HEADER_ROW=GOOGLE_SHEETS_HEADER_ROW:latest,\
           GOOGLE_SHEETS_WORKSHEET=GOOGLE_SHEETS_WORKSHEET:latest,\
@@ -67,7 +68,3 @@ jobs:
           QDRANT_COLLECTION=QDRANT_COLLECTION:latest,\
           QDRANT_URL=QDRANT_URL:latest,\
           TAVILY_API_KEY=TAVILY_API_KEY:latest"
-
-          gcloud run services update $SERVICE_NAME \
-            --region us-central1 \
-            --update-secrets="/usr/src/app/src/credentials/datapath-ai-david-sanchez-500c274bd309.json=GOOGLE_APPLICATION_CREDENTIALS:latest"
