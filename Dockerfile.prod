@@ -16,7 +16,7 @@ ENV PYTHONPATH=/usr/src/app/src
 # copy src code
 COPY ./src ./src
 
-EXPOSE 8080
+EXPOSE 4000
 
 # start the server
-CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers"]
+CMD ["sh", "-c", "uvicorn src.main_chatwoot:app --host 0.0.0.0 --port 4000 --proxy-headers"]
